@@ -1,0 +1,10 @@
+target/
+.git/
+.gitignore
+.idea/
+.DS_Store
+README.md
+SUBMISSION_TEMPLATE.md
+postman/
+*.log
+

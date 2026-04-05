@@ -1,0 +1,1901 @@
+{
+  "info": {
+    "name": "Finance Backend API — Complete Test Suite",
+    "_postman_id": "finance-backend-complete-v1",
+    "description": "End-to-end Postman collection for the Finance Backend API.\n\n─── HOW TO USE ───────────────────────────────────────────\n1. Import this file into Postman (File → Import)\n2. Make sure your Spring Boot app is running on http://localhost:8080\n3. Open the Collection → Variables tab and confirm baseUrl = http://localhost:8080\n4. Run requests in the ORDER they appear in each folder.\n   The very first request is 'Login as Admin' — it auto-saves the token.\n   Every other request uses that token automatically.\n\n─── WHAT GETS AUTO-SAVED ────────────────────────────────\nAfter login → the JWT token is saved to the collection variable 'authToken'\nAfter create user → new user's ID saved to 'createdUserId'\nAfter create transaction → transaction ID saved to 'createdTransactionId'\nYou never need to copy-paste IDs or tokens manually.\n\n─── CREDENTIALS ─────────────────────────────────────────\nAdmin login → username: admin | password: admin123\n─────────────────────────────────────────────────────────",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "description": "Base URL of the running Spring Boot server. Change port here if you modified application.yml."
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "description": "JWT token — auto-filled after running 'Login as Admin'. Do NOT edit manually."
+    },
+    {
+      "key": "createdUserId",
+      "value": "",
+      "description": "Auto-filled after 'Create New User (ANALYST)'. Used in subsequent user tests."
+    },
+    {
+      "key": "createdTransactionId",
+      "value": "",
+      "description": "Auto-filled after 'Create Transaction — INCOME'. Used in subsequent transaction tests."
+    },
+    {
+      "key": "secondTransactionId",
+      "value": "",
+      "description": "Auto-filled after 'Create Transaction — EXPENSE'. Used in filter tests."
+    }
+  ],
+
+  "item": [
+
+    {
+      "name": "00 — PRE-FLIGHT CHECK",
+      "description": "Run this first to verify the server is up before testing anything else.",
+      "item": [
+        {
+          "name": "Health Check — Roles List (Public Endpoint)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// ── What this test does ───────────────────────────────────────",
+                  "// Hits the public /api/roles endpoint. No token required.",
+                  "// If the server is running you'll get 200 + a list of 3 roles.",
+                  "",
+                  "pm.test('✅ Server is running (status 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ Response has success = true', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('✅ Roles array has exactly 3 items (VIEWER, ANALYST, ADMIN)', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data).to.be.an('array');",
+                  "    pm.expect(body.data.length).to.equal(3);",
+                  "});",
+                  "",
+                  "pm.test('✅ Role names are VIEWER, ANALYST, ADMIN', function () {",
+                  "    const names = pm.response.json().data.map(r => r.name);",
+                  "    pm.expect(names).to.include('VIEWER');",
+                  "    pm.expect(names).to.include('ANALYST');",
+                  "    pm.expect(names).to.include('ADMIN');",
+                  "});",
+                  "",
+                  "console.log('Server is UP. Roles seeded correctly. You can proceed to auth tests.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "roles"]
+            },
+            "description": "Public endpoint — no token needed.\nVerifies the server is running and data.sql seeding worked."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "01 — AUTHENTICATION",
+      "description": "Run 'Login as Admin' first. It auto-saves the JWT token to {{authToken}}.\nAll requests in every other folder use {{authToken}} automatically.",
+      "item": [
+
+        {
+          "name": "Login as Admin ⭐ (Run First — Saves Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// ── What this script does ────────────────────────────────────",
+                  "// After the login response comes back, we extract the JWT token",
+                  "// from response.data.token and save it to the collection variable",
+                  "// 'authToken'. Every other request uses {{authToken}} in its",
+                  "// Authorization header automatically.",
+                  "",
+                  "pm.test('✅ Login successful (status 200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ Response body has success = true', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('✅ Response contains a JWT token', function () {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data.token).to.be.a('string');",
+                  "    pm.expect(data.token.length).to.be.greaterThan(20);",
+                  "});",
+                  "",
+                  "pm.test('✅ Token type is Bearer', function () {",
+                  "    pm.expect(pm.response.json().data.tokenType).to.equal('Bearer');",
+                  "});",
+                  "",
+                  "pm.test('✅ Role is ADMIN', function () {",
+                  "    pm.expect(pm.response.json().data.role).to.equal('ADMIN');",
+                  "});",
+                  "",
+                  "// ── AUTO-SAVE the token ──────────────────────────────────────",
+                  "// This is the key line. It saves the token so every",
+                  "// other request can use {{authToken}} without copy-pasting.",
+                  "const token = pm.response.json().data.token;",
+                  "pm.collectionVariables.set('authToken', token);",
+                  "",
+                  "console.log('✅ Token saved to {{authToken}}. You can now run any other request.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticates with the seeded admin account.\n\nOn success → saves JWT to {{authToken}} automatically.\nYou only need to run this once per session (token is valid for 24 hours).\n\nDefault credentials:\n  username: admin\n  password: admin123"
+          }
+        },
+
+        {
+          "name": "Login — Wrong Password (Should Return 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('✅ success is false', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.false;",
+                  "});",
+                  "",
+                  "pm.test('✅ Error code is INVALID_CREDENTIALS', function () {",
+                  "    const errors = pm.response.json().errors;",
+                  "    pm.expect(errors[0].code).to.equal('INVALID_CREDENTIALS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"wrongpassword\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Intentionally wrong password → expects 401 + INVALID_CREDENTIALS error code."
+          }
+        },
+
+        {
+          "name": "Login — Missing Fields (Should Return 400 Validation Error)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('✅ Errors array is not empty', function () {",
+                  "    pm.expect(pm.response.json().errors.length).to.be.greaterThan(0);",
+                  "});",
+                  "",
+                  "pm.test('✅ Error mentions username or password field', function () {",
+                  "    const fields = pm.response.json().errors.map(e => e.field);",
+                  "    const hasMissingField = fields.includes('username') || fields.includes('password');",
+                  "    pm.expect(hasMissingField).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"\",\n  \"password\": \"\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Blank username and password → expects 400 + VALIDATION_ERROR listing both fields."
+          }
+        },
+
+        {
+          "name": "Get My Profile (/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('✅ Returns current user username = admin', function () {",
+                  "    pm.expect(pm.response.json().data.username).to.equal('admin');",
+                  "});",
+                  "",
+                  "pm.test('✅ Role is ADMIN', function () {",
+                  "    pm.expect(pm.response.json().data.role.name).to.equal('ADMIN');",
+                  "});",
+                  "",
+                  "pm.test('✅ Password is NOT exposed in response', function () {",
+                  "    pm.expect(pm.response.json().data.password).to.be.undefined;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Returns the profile of the currently logged-in user.\nRequires a valid JWT in the Authorization header."
+          }
+        },
+
+        {
+          "name": "Access Protected Route Without Token (Should Return 401/403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status is 401 or 403 (not 200)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "});",
+                  "",
+                  "console.log('Good — unauthenticated access was blocked as expected.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "No Authorization header → should be rejected.\nProves the security filter chain is working."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "02 — ROLES",
+      "description": "Role reference data. ADMIN can access both endpoints. All authenticated users see /api/roles.",
+      "item": [
+
+        {
+          "name": "Get All Roles (Public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Returns 3 roles', function () {",
+                  "    pm.expect(pm.response.json().data.length).to.equal(3);",
+                  "});",
+                  "pm.test('✅ Each role has id, name, description', function () {",
+                  "    pm.response.json().data.forEach(role => {",
+                  "        pm.expect(role).to.have.property('id');",
+                  "        pm.expect(role).to.have.property('name');",
+                  "        pm.expect(role).to.have.property('description');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "roles"]
+            },
+            "description": "Public endpoint — no token required.\nReturns VIEWER (id:1), ANALYST (id:2), ADMIN (id:3)."
+          }
+        },
+
+        {
+          "name": "Get Role by ID — ADMIN (id: 3)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Role name is ADMIN', function () {",
+                  "    pm.expect(pm.response.json().data.name).to.equal('ADMIN');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles/3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "roles", "3"]
+            },
+            "description": "ADMIN only. Returns the ADMIN role detail.\nChange /3 to /1 or /2 to see VIEWER or ANALYST."
+          }
+        },
+
+        {
+          "name": "Get Role by ID — Not Found (id: 9999)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ success is false', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.false;",
+                  "});",
+                  "pm.test('✅ Error code is NOT_FOUND', function () {",
+                  "    pm.expect(pm.response.json().errors[0].code).to.equal('NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/roles/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "roles", "9999"]
+            },
+            "description": "ID 9999 doesn't exist → expects NOT_FOUND error."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "03 — USER MANAGEMENT",
+      "description": "All user CRUD operations. Run in order — Create first, then Get/Edit/Status/Delete.\nThe Create request auto-saves the new user's ID to {{createdUserId}}.",
+      "item": [
+
+        {
+          "name": "Create New User — ANALYST Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('✅ success is true', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('✅ Returned user has correct username', function () {",
+                  "    pm.expect(pm.response.json().data.username).to.equal('samarth_analyst');",
+                  "});",
+                  "",
+                  "pm.test('✅ Role assigned is ANALYST', function () {",
+                  "    pm.expect(pm.response.json().data.role.name).to.equal('ANALYST');",
+                  "});",
+                  "",
+                  "pm.test('✅ Status is ACTIVE by default', function () {",
+                  "    pm.expect(pm.response.json().data.status).to.equal('ACTIVE');",
+                  "});",
+                  "",
+                  "pm.test('✅ Password is NOT in the response', function () {",
+                  "    pm.expect(pm.response.json().data.password).to.be.undefined;",
+                  "});",
+                  "",
+                  "// ── AUTO-SAVE the new user's ID ───────────────────────────────",
+                  "const newUserId = pm.response.json().data.id;",
+                  "pm.collectionVariables.set('createdUserId', newUserId);",
+                  "console.log('✅ New user ID saved to {{createdUserId}}: ' + newUserId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"samarth_analyst\",\n  \"email\": \"samarth.narayankar@finance.com\",\n  \"password\": \"password123\",\n  \"fullName\": \"Samarth Narayankar\",\n  \"roleId\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Creates a new ANALYST user.\nroleId: 1=VIEWER, 2=ANALYST, 3=ADMIN\n\nOn success → auto-saves new user's ID to {{createdUserId}}"
+          }
+        },
+
+        {
+          "name": "Create User — Duplicate Username (Should Fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('✅ Error code is DUPLICATE_ENTRY', function () {",
+                  "    pm.expect(pm.response.json().errors[0].code).to.equal('DUPLICATE_ENTRY');",
+                  "});",
+                  "pm.test('✅ Error field is username', function () {",
+                  "    pm.expect(pm.response.json().errors[0].field).to.equal('username');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"jane_analyst\",\n  \"email\": \"different@finance.com\",\n  \"password\": \"password123\",\n  \"fullName\": \"Another Jane\",\n  \"roleId\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Same username as already-created jane_analyst → expects DUPLICATE_ENTRY error on 'username' field."
+          }
+        },
+
+        {
+          "name": "Create User — Validation Errors (Blank Fields)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('✅ Multiple validation errors returned', function () {",
+                  "    pm.expect(pm.response.json().errors.length).to.be.greaterThan(1);",
+                  "});",
+                  "pm.test('✅ All errors have code VALIDATION_ERROR', function () {",
+                  "    pm.response.json().errors.forEach(e => {",
+                  "        pm.expect(e.code).to.equal('VALIDATION_ERROR');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"\",\n  \"email\": \"not-an-email\",\n  \"password\": \"123\",\n  \"fullName\": \"\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Intentionally malformed data:\n  username = blank → error\n  email = not a valid email → error\n  password = only 3 chars (min is 6) → error\n  fullName = blank → error\n  roleId = missing → error\n\nExpects multiple VALIDATION_ERROR entries."
+          }
+        },
+
+        {
+          "name": "Get All Users (Paginated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ success is true', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "});",
+                  "pm.test('✅ Data has pagination fields', function () {",
+                  "    const data = pm.response.json().data;",
+                  "    pm.expect(data).to.have.property('content');",
+                  "    pm.expect(data).to.have.property('totalElements');",
+                  "    pm.expect(data).to.have.property('totalPages');",
+                  "    pm.expect(data).to.have.property('page');",
+                  "    pm.expect(data).to.have.property('size');",
+                  "});",
+                  "pm.test('✅ At least 2 users exist (admin + samarth_analyst)', function () {",
+                  "    pm.expect(pm.response.json().data.totalElements).to.be.at.least(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"],
+              "query": [
+                { "key": "page", "value": "0", "description": "0-based page index" },
+                { "key": "size", "value": "20", "description": "items per page" },
+                { "key": "query", "value": "", "description": "optional search term — leave blank for all users", "disabled": true }
+              ]
+            },
+            "description": "Returns a paginated list of all users.\nAdd ?query=jane to search by username or fullName.\n\nPagination:\n  page = 0 means first page (0-indexed)\n  size = how many per page (max 100)"
+          }
+        },
+
+        {
+          "name": "Search Users — query=jane",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Search returns at least 1 result', function () {",
+                  "    pm.expect(pm.response.json().data.content.length).to.be.at.least(1);",
+                  "});",
+                  "pm.test('✅ Results contain jane in username or fullName', function () {",
+                  "    pm.response.json().data.content.forEach(user => {",
+                  "        const match = user.username.toLowerCase().includes('jane') ||",
+                  "                      user.fullName.toLowerCase().includes('jane');",
+                  "        pm.expect(match).to.be.true;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users?query=jane&page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"],
+              "query": [
+                { "key": "query", "value": "jane" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Search users whose username or fullName contains 'jane' (case-insensitive)."
+          }
+        },
+
+        {
+          "name": "Get User by ID — New User ({{createdUserId}})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Correct user returned', function () {",
+                  "    pm.expect(pm.response.json().data.username).to.equal('jane_analyst');",
+                  "});",
+                  "pm.test('✅ Role info is embedded', function () {",
+                  "    pm.expect(pm.response.json().data.role).to.be.an('object');",
+                  "    pm.expect(pm.response.json().data.role.name).to.equal('ANALYST');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{createdUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{createdUserId}}"]
+            },
+            "description": "Fetches the user we just created.\n{{createdUserId}} was auto-saved by the Create request above."
+          }
+        },
+
+        {
+          "name": "Get User by ID — Not Found (9999)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 404', function () { pm.response.to.have.status(404); });",
+                  "pm.test('✅ Error code NOT_FOUND', function () {",
+                  "    pm.expect(pm.response.json().errors[0].code).to.equal('NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/9999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "9999"]
+            },
+            "description": "ID 9999 does not exist → expects 404 + NOT_FOUND."
+          }
+        },
+
+        {
+          "name": "Edit User — Change Full Name and Email (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ fullName was updated', function () {",
+                  "    pm.expect(pm.response.json().data.fullName).to.equal('Jane Updated Analyst');",
+                  "});",
+                  "pm.test('✅ email was updated', function () {",
+                  "    pm.expect(pm.response.json().data.email).to.equal('jane.updated@finance.com');",
+                  "});",
+                  "pm.test('✅ username was NOT changed (PATCH only changes sent fields)', function () {",
+                  "    pm.expect(pm.response.json().data.username).to.equal('jane_analyst');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Jane Updated Analyst\",\n  \"email\": \"jane.updated@finance.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{createdUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{createdUserId}}"]
+            },
+            "description": "PATCH = partial update. Only the fields you include in the body are changed.\nIn this example: fullName and email change. username stays the same.\n\nYou can also pass roleId to reassign a role."
+          }
+        },
+
+        {
+          "name": "Change User Status — Deactivate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ User status is now INACTIVE', function () {",
+                  "    pm.expect(pm.response.json().data.status).to.equal('INACTIVE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INACTIVE\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{createdUserId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{createdUserId}}", "status"]
+            },
+            "description": "Deactivates a user. Their account exists but they cannot log in.\nTo re-enable: send { \"status\": \"ACTIVE\" } to the same endpoint."
+          }
+        },
+
+        {
+          "name": "Change User Status — Reactivate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ User status is now ACTIVE again', function () {",
+                  "    pm.expect(pm.response.json().data.status).to.equal('ACTIVE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{createdUserId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{createdUserId}}", "status"]
+            },
+            "description": "Re-enables a deactivated user account."
+          }
+        },
+
+        {
+          "name": "Delete User (Soft Delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});",
+                  "console.log('User soft-deleted. They still exist in DB with is_active=false.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{createdUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{createdUserId}}"]
+            },
+            "description": "Soft-deletes the user. Sets is_active=false in the database.\nThe record is NOT physically deleted — it's preserved for audit history.\nThe user will no longer appear in any API listing."
+          }
+        },
+
+        {
+          "name": "Get Deleted User — Should Return 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Deleted user returns 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test('✅ Error code is NOT_FOUND', function () {",
+                  "    pm.expect(pm.response.json().errors[0].code).to.equal('NOT_FOUND');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{createdUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{createdUserId}}"]
+            },
+            "description": "Confirms the soft-deleted user is no longer accessible via the API."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "04 — TRANSACTION MANAGEMENT",
+      "description": "Financial records CRUD. Run Create requests first — they auto-save IDs.\nAll filter/dashboard tests depend on having transactions in the database.",
+      "item": [
+
+        {
+          "name": "Create Transaction — INCOME (Salary)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('✅ success is true', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "});",
+                  "pm.test('✅ Amount matches request (85000.00)', function () {",
+                  "    pm.expect(parseFloat(pm.response.json().data.amount)).to.equal(85000.00);",
+                  "});",
+                  "pm.test('✅ Type is INCOME', function () {",
+                  "    pm.expect(pm.response.json().data.type).to.equal('INCOME');",
+                  "});",
+                  "pm.test('✅ Category is Salary', function () {",
+                  "    pm.expect(pm.response.json().data.category).to.equal('Salary');",
+                  "});",
+                  "pm.test('✅ createdBy is set', function () {",
+                  "    pm.expect(pm.response.json().data.createdBy).to.be.a('string');",
+                  "});",
+                  "",
+                  "// AUTO-SAVE transaction ID",
+                  "pm.collectionVariables.set('createdTransactionId', pm.response.json().data.id);",
+                  "console.log('✅ Income transaction ID saved: ' + pm.response.json().data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 85000.00,\n  \"type\": \"INCOME\",\n  \"category\": \"Salary\",\n  \"date\": \"2024-03-01\",\n  \"notes\": \"March base salary payment — Samarth Narayankar\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"]
+            },
+            "description": "Creates an INCOME transaction.\nType must be: INCOME or EXPENSE (case-sensitive)\nDate format: YYYY-MM-DD\nAmount: positive number, max 2 decimal places\n\nOn success → auto-saves ID to {{createdTransactionId}}"
+          }
+        },
+
+        {
+          "name": "Create Transaction — EXPENSE (Rent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('✅ Type is EXPENSE', function () {",
+                  "    pm.expect(pm.response.json().data.type).to.equal('EXPENSE');",
+                  "});",
+                  "// Save second transaction ID",
+                  "pm.collectionVariables.set('secondTransactionId', pm.response.json().data.id);",
+                  "console.log('✅ Expense transaction ID saved: ' + pm.response.json().data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 25000.00,\n  \"type\": \"EXPENSE\",\n  \"category\": \"Rent\",\n  \"date\": \"2024-03-05\",\n  \"notes\": \"March office rent\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"]
+            },
+            "description": "Creates an EXPENSE transaction for Rent.\n{{secondTransactionId}} auto-saved for use in filter tests."
+          }
+        },
+
+        {
+          "name": "Create Transaction — EXPENSE (Groceries)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('✅ Category is Groceries', function () {",
+                  "    pm.expect(pm.response.json().data.category).to.equal('Groceries');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 4500.00,\n  \"type\": \"EXPENSE\",\n  \"category\": \"Groceries\",\n  \"date\": \"2024-03-10\",\n  \"notes\": \"Weekly groceries\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"]
+            },
+            "description": "Creates a third transaction. Adds variety for filter tests."
+          }
+        },
+
+        {
+          "name": "Create Transaction — INCOME (Freelance)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 201', function () { pm.response.to.have.status(201); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 15000.00,\n  \"type\": \"INCOME\",\n  \"category\": \"Freelance\",\n  \"date\": \"2024-03-15\",\n  \"notes\": \"Web design project payment\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"]
+            },
+            "description": "A fourth transaction for better dashboard data."
+          }
+        },
+
+        {
+          "name": "Create Transaction — VALIDATION ERRORS (Should Fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 400', function () { pm.response.to.have.status(400); });",
+                  "pm.test('✅ success is false', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.false;",
+                  "});",
+                  "pm.test('✅ Errors mention amount or date', function () {",
+                  "    const fields = pm.response.json().errors.map(e => e.field);",
+                  "    pm.expect(fields.some(f => ['amount', 'date', 'category', 'type'].includes(f))).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": -500,\n  \"type\": null,\n  \"category\": \"\",\n  \"date\": \"2099-01-01\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"]
+            },
+            "description": "Intentionally invalid:\n  amount = negative → error\n  type = null → error\n  category = blank → error\n  date = future date → error"
+          }
+        },
+
+        {
+          "name": "Get Transaction by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Returned ID matches request', function () {",
+                  "    const id = pm.collectionVariables.get('createdTransactionId');",
+                  "    pm.expect(pm.response.json().data.id).to.equal(parseInt(id));",
+                  "});",
+                  "pm.test('✅ Full detail fields present', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d).to.have.property('amount');",
+                  "    pm.expect(d).to.have.property('type');",
+                  "    pm.expect(d).to.have.property('category');",
+                  "    pm.expect(d).to.have.property('date');",
+                  "    pm.expect(d).to.have.property('createdBy');",
+                  "    pm.expect(d).to.have.property('createdAt');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/{{createdTransactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "{{createdTransactionId}}"]
+            },
+            "description": "Fetches the first income transaction we created.\n{{createdTransactionId}} was auto-saved during Create."
+          }
+        },
+
+        {
+          "name": "Get All Transactions — No Filter (All Records)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ At least 4 transactions returned', function () {",
+                  "    pm.expect(pm.response.json().data.totalElements).to.be.at.least(4);",
+                  "});",
+                  "pm.test('✅ Pagination structure is correct', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(d).to.have.all.keys('content', 'page', 'size', 'totalElements', 'totalPages', 'last');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Returns all transactions (no filter). Paginated.\nAdd filter params in the Params tab to narrow results."
+          }
+        },
+
+        {
+          "name": "Filter — Only EXPENSE Transactions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Every returned item is EXPENSE', function () {",
+                  "    pm.response.json().data.content.forEach(tx => {",
+                  "        pm.expect(tx.type).to.equal('EXPENSE');",
+                  "    });",
+                  "});",
+                  "pm.test('✅ At least 2 EXPENSE records', function () {",
+                  "    pm.expect(pm.response.json().data.totalElements).to.be.at.least(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?type=EXPENSE&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "type", "value": "EXPENSE", "description": "INCOME or EXPENSE" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Filters to show only EXPENSE records.\nVerifies every returned record is of type EXPENSE."
+          }
+        },
+
+        {
+          "name": "Filter — Only INCOME Transactions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Every returned item is INCOME', function () {",
+                  "    pm.response.json().data.content.forEach(tx => {",
+                  "        pm.expect(tx.type).to.equal('INCOME');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?type=INCOME",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "type", "value": "INCOME" }
+              ]
+            }
+          }
+        },
+
+        {
+          "name": "Filter — By Category (Rent)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Category contains Rent', function () {",
+                  "    pm.response.json().data.content.forEach(tx => {",
+                  "        pm.expect(tx.category.toLowerCase()).to.include('rent');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?category=Rent",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "category", "value": "Rent", "description": "Partial match, case-insensitive" }
+              ]
+            },
+            "description": "Category filter is a partial, case-insensitive match.\n'Rent' would also match 'rental', 'rent expense' etc."
+          }
+        },
+
+        {
+          "name": "Filter — By Date Range (March 2024)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ All dates fall within 2024-03-01 to 2024-03-31', function () {",
+                  "    pm.response.json().data.content.forEach(tx => {",
+                  "        const d = new Date(tx.date);",
+                  "        pm.expect(d >= new Date('2024-03-01')).to.be.true;",
+                  "        pm.expect(d <= new Date('2024-03-31')).to.be.true;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?startDate=2024-03-01&endDate=2024-03-31&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "startDate", "value": "2024-03-01", "description": "Format: YYYY-MM-DD" },
+                { "key": "endDate",   "value": "2024-03-31", "description": "Format: YYYY-MM-DD" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Returns only transactions within March 2024.\nDate format MUST be YYYY-MM-DD."
+          }
+        },
+
+        {
+          "name": "Filter — Combined (EXPENSE + Date Range)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ All items are EXPENSE in date range', function () {",
+                  "    pm.response.json().data.content.forEach(tx => {",
+                  "        pm.expect(tx.type).to.equal('EXPENSE');",
+                  "        const d = new Date(tx.date);",
+                  "        pm.expect(d >= new Date('2024-03-01')).to.be.true;",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions?type=EXPENSE&startDate=2024-03-01&endDate=2024-03-31&page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"],
+              "query": [
+                { "key": "type",      "value": "EXPENSE" },
+                { "key": "startDate", "value": "2024-03-01" },
+                { "key": "endDate",   "value": "2024-03-31" },
+                { "key": "page",      "value": "0" },
+                { "key": "size",      "value": "20" }
+              ]
+            },
+            "description": "Combines type + date range filter.\nAll filter parameters are optional and stackable."
+          }
+        },
+
+        {
+          "name": "Edit Transaction — Update Amount Only (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Amount updated to 90000.00', function () {",
+                  "    pm.expect(parseFloat(pm.response.json().data.amount)).to.equal(90000.00);",
+                  "});",
+                  "pm.test('✅ Other fields unchanged (category still Salary)', function () {",
+                  "    pm.expect(pm.response.json().data.category).to.equal('Salary');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 90000.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/{{createdTransactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "{{createdTransactionId}}"]
+            },
+            "description": "PATCH only changes the fields you send.\nHere we only update amount. Category, date, notes remain the same."
+          }
+        },
+
+        {
+          "name": "Edit Transaction — Update Category and Notes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Category updated', function () {",
+                  "    pm.expect(pm.response.json().data.category).to.equal('Base Salary');",
+                  "});",
+                  "pm.test('✅ Notes updated', function () {",
+                  "    pm.expect(pm.response.json().data.notes).to.equal('Updated: March + April bonus');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"Base Salary\",\n  \"notes\": \"Updated: March + April bonus\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/{{createdTransactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "{{createdTransactionId}}"]
+            }
+          }
+        },
+
+        {
+          "name": "Delete Transaction (Soft Delete)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});",
+                  "console.log('Transaction soft-deleted (is_deleted=true). Still in DB for audit.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/{{secondTransactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "{{secondTransactionId}}"]
+            },
+            "description": "Soft-deletes the Rent expense transaction.\nDeleted transactions are hidden from all API queries but preserved in the DB."
+          }
+        },
+
+        {
+          "name": "Get Deleted Transaction — Should Return 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ 404 after soft delete', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions/{{secondTransactionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions", "{{secondTransactionId}}"]
+            },
+            "description": "Confirms soft-deleted transaction is no longer accessible via the API."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "05 — DASHBOARD ANALYTICS",
+      "description": "Summary analytics endpoints. Run AFTER creating transactions.\nAll-time summary plus date-filtered examples.",
+      "item": [
+
+        {
+          "name": "Dashboard Summary — All Time (No Filter)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ success is true', function () {",
+                  "    pm.expect(pm.response.json().success).to.be.true;",
+                  "});",
+                  "",
+                  "const d = pm.response.json().data;",
+                  "",
+                  "pm.test('✅ totalIncome is a number >= 0', function () {",
+                  "    pm.expect(parseFloat(d.totalIncome)).to.be.at.least(0);",
+                  "});",
+                  "",
+                  "pm.test('✅ totalExpenses is a number >= 0', function () {",
+                  "    pm.expect(parseFloat(d.totalExpenses)).to.be.at.least(0);",
+                  "});",
+                  "",
+                  "pm.test('✅ netBalance = totalIncome - totalExpenses', function () {",
+                  "    const expected = parseFloat(d.totalIncome) - parseFloat(d.totalExpenses);",
+                  "    pm.expect(parseFloat(d.netBalance)).to.be.closeTo(expected, 0.01);",
+                  "});",
+                  "",
+                  "pm.test('✅ totalTransactionCount >= 3', function () {",
+                  "    pm.expect(d.totalTransactionCount).to.be.at.least(3);",
+                  "});",
+                  "",
+                  "pm.test('✅ categoryBreakdown is an array', function () {",
+                  "    pm.expect(d.categoryBreakdown).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('✅ monthlyTrends is an array', function () {",
+                  "    pm.expect(d.monthlyTrends).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('✅ recentTransactions has at most 5 items', function () {",
+                  "    pm.expect(d.recentTransactions.length).to.be.at.most(5);",
+                  "});",
+                  "",
+                  "pm.test('✅ Each category breakdown has type, category, total', function () {",
+                  "    d.categoryBreakdown.forEach(c => {",
+                  "        pm.expect(c).to.have.property('type');",
+                  "        pm.expect(c).to.have.property('category');",
+                  "        pm.expect(c).to.have.property('total');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('✅ Each monthly trend has year, month, monthName, incomeTotal, expenseTotal', function () {",
+                  "    d.monthlyTrends.forEach(m => {",
+                  "        pm.expect(m).to.have.property('year');",
+                  "        pm.expect(m).to.have.property('month');",
+                  "        pm.expect(m).to.have.property('monthName');",
+                  "        pm.expect(m).to.have.property('incomeTotal');",
+                  "        pm.expect(m).to.have.property('expenseTotal');",
+                  "    });",
+                  "});",
+                  "",
+                  "console.log('Dashboard Summary:');",
+                  "console.log('  Total Income:   ' + d.totalIncome);",
+                  "console.log('  Total Expenses: ' + d.totalExpenses);",
+                  "console.log('  Net Balance:    ' + d.netBalance);",
+                  "console.log('  Records:        ' + d.totalTransactionCount);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "summary"]
+            },
+            "description": "Returns the full analytics dashboard with ALL-TIME data.\n\nResponse sections:\n  totalIncome       → sum of all INCOME records\n  totalExpenses     → sum of all EXPENSE records\n  netBalance        → totalIncome - totalExpenses\n  totalTransactionCount → count of all active records\n  categoryBreakdown → array of {type, category, total} for pie chart\n  monthlyTrends     → array of {year, month, incomeTotal, expenseTotal} for bar chart\n  recentTransactions → latest 5 transactions for activity feed"
+          }
+        },
+
+        {
+          "name": "Dashboard Summary — March 2024 Only",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ Applied date range is set in response', function () {",
+                  "    pm.expect(pm.response.json().data.appliedStartDate).to.equal('2024-03-01');",
+                  "    pm.expect(pm.response.json().data.appliedEndDate).to.equal('2024-03-31');",
+                  "});",
+                  "pm.test('✅ totals are non-negative', function () {",
+                  "    const d = pm.response.json().data;",
+                  "    pm.expect(parseFloat(d.totalIncome)).to.be.at.least(0);",
+                  "    pm.expect(parseFloat(d.totalExpenses)).to.be.at.least(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/summary?startDate=2024-03-01&endDate=2024-03-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "summary"],
+              "query": [
+                { "key": "startDate", "value": "2024-03-01", "description": "YYYY-MM-DD" },
+                { "key": "endDate",   "value": "2024-03-31", "description": "YYYY-MM-DD" }
+              ]
+            },
+            "description": "Returns dashboard analytics filtered to March 2024 only.\nThe appliedStartDate and appliedEndDate fields in the response confirm which filter was applied."
+          }
+        },
+
+        {
+          "name": "Dashboard Summary — From Jan 2024 (No End Date)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('✅ appliedStartDate is set', function () {",
+                  "    pm.expect(pm.response.json().data.appliedStartDate).to.equal('2024-01-01');",
+                  "});",
+                  "pm.test('✅ appliedEndDate is null (no end filter)', function () {",
+                  "    pm.expect(pm.response.json().data.appliedEndDate).to.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/summary?startDate=2024-01-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "summary"],
+              "query": [
+                { "key": "startDate", "value": "2024-01-01" }
+              ]
+            },
+            "description": "startDate only — from Jan 1 2024 to present day.\nendDate is null → no upper bound filter applied."
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "06 — ACCESS CONTROL VERIFICATION",
+      "description": "These tests verify that ROLE RESTRICTIONS work correctly.\nA VIEWER cannot create/delete records. A non-ADMIN cannot manage users.\n\nTo test these you need to CREATE a VIEWER user first and log in as them.\nFollow the steps in the request descriptions.",
+      "item": [
+
+        {
+          "name": "STEP 1: Create a VIEWER User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ VIEWER user created (status 201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "console.log('VIEWER user ID: ' + pm.response.json().data.id);",
+                  "console.log('Now log in as viewer_user / viewerpass123 to test access control.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"viewer_user\",\n  \"email\": \"viewer@finance.com\",\n  \"password\": \"viewerpass123\",\n  \"fullName\": \"Viewer User\",\n  \"roleId\": 1\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Creates a VIEWER role user (roleId: 1).\nUse this account to test that VIEWER cannot create/delete transactions."
+          }
+        },
+
+        {
+          "name": "STEP 2: Login as VIEWER (Get VIEWER Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ VIEWER login successful', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('✅ Role is VIEWER', function () {",
+                  "    pm.expect(pm.response.json().data.role).to.equal('VIEWER');",
+                  "});",
+                  "",
+                  "// Save VIEWER token to a separate variable",
+                  "const viewerToken = pm.response.json().data.token;",
+                  "pm.collectionVariables.set('viewerToken', viewerToken);",
+                  "console.log('VIEWER token saved. Now run the VIEWER access tests below.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"viewer_user\",\n  \"password\": \"viewerpass123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Log in as the VIEWER user created in Step 1.\nSaves the token to {{viewerToken}}."
+          }
+        },
+
+        {
+          "name": "STEP 3: VIEWER Can View Dashboard (Allowed ✅)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ VIEWER can access dashboard (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{viewerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dashboard/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "dashboard", "summary"]
+            },
+            "description": "VIEWER role IS allowed to view the dashboard.\nExpects 200 — this access should succeed."
+          }
+        },
+
+        {
+          "name": "STEP 4: VIEWER Cannot Create Transaction (Blocked ❌)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ VIEWER blocked from creating transactions (403)', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "pm.test('✅ Error code is FORBIDDEN', function () {",
+                  "    pm.expect(pm.response.json().errors[0].code).to.equal('FORBIDDEN');",
+                  "});",
+                  "console.log('Access control working correctly — VIEWER cannot create transactions.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{viewerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.00,\n  \"type\": \"INCOME\",\n  \"category\": \"Test\",\n  \"date\": \"2024-03-01\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"]
+            },
+            "description": "VIEWER role is NOT allowed to create transactions.\nExpects 403 Forbidden — this access should be DENIED."
+          }
+        },
+
+        {
+          "name": "STEP 5: VIEWER Cannot List Users (Blocked ❌)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ VIEWER blocked from user list (403)', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{viewerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "GET /api/users requires ADMIN role.\nVIEWER token → expects 403."
+          }
+        },
+
+        {
+          "name": "STEP 6: VIEWER Can Read Transactions (Allowed ✅)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ VIEWER can read transaction list (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{viewerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/transactions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "transactions"]
+            },
+            "description": "Read access to transactions IS allowed for VIEWER.\nExpects 200 — confirming VIEWER can view but not modify data."
+          }
+        }
+      ]
+    }
+
+  ]
+}
