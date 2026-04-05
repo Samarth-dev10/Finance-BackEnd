@@ -4,6 +4,8 @@ This guide explains how to import and run the provided Postman collection to tes
 
 > Collection file: `Finance-Backend-API.postman_collection.json`
 
+> Public API Documentation (Postman): https://documenter.getpostman.com/view/43491968/2sBXiqEUFQ
+
 ---
 
 ## 1) Quick Start (2 minutes)

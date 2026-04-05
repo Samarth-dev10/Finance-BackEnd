@@ -372,6 +372,8 @@ curl -X GET http://localhost:8080/api/dashboard/summary \
 
 ### Using Postman (Recommended for Full Testing)
 
+> Public API Documentation (Postman): https://documenter.getpostman.com/view/43491968/2sBXiqEUFQ
+
 1. **Import Collection:**
    - Open Postman
    - Click "Import"
@@ -2042,6 +2044,7 @@ No data in tables after startup
 - **SUBMISSION_TEMPLATE.md** - Project submission details and verification
 - **postman/README_Postman_Collection.md** - Postman collection usage guide
 - **postman/Finance-Backend-API.postman_collection.json** - API requests
+- **Public Postman API Docs** - https://documenter.getpostman.com/view/43491968/2sBXiqEUFQ
 
 ### External References
 - Spring Boot: https://spring.io/projects/spring-boot
